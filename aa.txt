@@ -1,0 +1,125 @@
+import datetime
+
+class QiMenAutomation:
+def __init__(self):
+self.TIANGAN = "甲乙丙丁戊己庚辛壬癸"
+self.DIZHI = "子丑寅卯辰巳午未申酉戌亥"
+self.PALACES = [1, 8, 3, 4, 9, 2, 7, 6]  # 順時針轉動的宮位（不含中5）
+
+# 2024-2026 節氣參考數據 (簡化版，建議正式環境可對接天文庫)
+self.JIEQI_DATA = {
+2026: {
+立春: datetime.datetime(2026, 2, 4, 7, 39),
+雨水: datetime.datetime(2026, 2, 19, 3, 34),
+驚蟄: datetime.datetime(2026, 3, 5, 1, 48),
+春分: datetime.datetime(2026, 3, 20, 2, 45),
+清明: datetime.datetime(2026, 4, 5, 6, 44),
+穀雨: datetime.datetime(2026, 4, 20, 13, 57),
+立夏: datetime.datetime(2026, 5, 5, 23, 59),
+夏至: datetime.datetime(2026, 6, 21, 18, 24),
+# ... 其他節氣可續添
+}
+}
+
+def get_ganzhi(self, dt):
+"計算給定時間的四柱（年、月、日、時）干支"
+# 基準點：2024-02-10 00:00 (農曆甲辰年正月初一) 為 甲辰年、丙寅月、甲辰日、甲子時
+base_dt = datetime.datetime(2024, 2, 10, 0, 0)
+delta = dt - base_dt
+
+# 日干支
+day_offset = delta.days
+day_idx = (40 + day_offset) % 60 # 40 是甲辰在六十甲子的位置
+day_gz = self.get_60gz(day_idx)
+
+# 時干支 (根據五子遁元)
+hour_idx_in_day = (dt.hour + 1) // 2
+# 這裡簡化處理，己日之未時為辛未
+# 邏輯：甲己還加甲，乙庚丙作初...
+start_gan_map = {"甲":0, "己":0, "乙":1, "庚":1, "丙":2, "辛":2, "丁":3, "壬":3, "戊":4, "癸":4}
+start_gan_idx = start_gan_map[day_gz[0]]
+hour_gan = self.TIANGAN[(start_gan_idx * 2 + hour_idx_in_day) % 10]
+hour_zhi = self.DIZHI[hour_idx_in_day % 12]
+
+return day_gz, f"{hour_gan}{hour_zhi}"
+
+def get_60gz(self, idx):
+return self.TIANGAN[idx % 10] + self.DIZHI[idx % 12]
+
+def get_ju(self, dt, day_gz):
+"判斷局數 (陽遁/陰遁、1-9局)"
+# 以 2026-03-16 為例，屬驚蟄後，陽遁
+# 這裡僅演示核心逻辑，實際應用建議擴展節氣判斷
+is_yang = True
+ju_num = 4 # 驚蟄下元
+return is_yang, ju_num
+
+def run_layout(self, is_yang, ju_num, day_gz, hour_gz):
+"九宮排盤核心邏輯"
+# 1. 地盤
+di_pan = {}
+stems_order = "戊己庚辛壬癸丁丙乙" if is_yang else "戊乙丙丁癸壬辛庚己"
+curr = ju_num
+for s in stems_order:
+di_pan[curr] = s
+curr = (curr + 1) if is_yang else (curr - 1)
+if curr > 9: curr = 1
+if curr < 1: curr = 9
+
+# 2. 尋找值符值使
+xun_shou_map = {"子":"戊", "戌":"己", "申":"庚", "午":"辛", "辰":"壬", "寅":"癸"}
+# 找出時干支所屬旬首
+h_gan_idx = self.TIANGAN.index(hour_gz[0])
+h_zhi_idx = self.DIZHI.index(hour_gz[1])
+xun_zhi_idx = (h_zhi_idx - h_gan_idx) % 12
+xun_shou_stem = xun_shou_map[self.DIZHI[xun_zhi_idx]]
+
+start_p = [k for k, v in di_pan.items() if v == xun_shou_stem][0]
+orig_star = {1:"天蓬", 8:"天任", 3:"天衝", 4:"天輔", 9:"天英", 2:"天芮", 7:"天柱", 6:"天心", 5:"天禽"}
+orig_gate = {1:"休門", 8:"生門", 3:"傷門", 4:"杜門", 9:"景門", 2:"死門", 7:"驚門", 6:"開門"}
+
+# 3. 天盤
+target_p = [k for k, v in di_pan.items() if v == hour_gz[0]][0] if hour_gz[0] != '甲' else start_p
+shift = (self.PALACES.index(target_p if target_p!=5 else 2) - self.PALACES.index(start_p if start_p!=5 else 2)) % 8
+
+# 4. 輸出結果格式化
+print(f"--- 奇門遁甲自動排盤 ({'陽' if is_yang else '陰'}遁 {ju_num} 局) ---")
+print(f"日柱: {day_gz} | 時柱: {hour_gz} | 旬首: 甲{self.DIZHI[xun_zhi_idx]}({xun_shou_stem})")
+print("-" * 40)
+
+grid = {}
+for i, p in enumerate(self.PALACES):
+old_p = self.PALACES[(i - shift) % 8]
+grid[p] = {
+星: orig_star[old_p],
+門: "待計算", # 這裡可續寫八門隨時支轉動邏輯
+天: di_pan[old_p] if old_p != 2 else di_pan[2]+di_pan[5],
+地: di_pan[p]
+}
+
+# 簡易 3x3 視覺化輸出
+rows = [[4, 9, 2], [3, 5, 7], [8, 1, 6]]
+for r in rows:
+line = ""
+for p in r:
+if p == 5:
+line += f"|  中宮({di_pan[5]})  "
+else:
+item = grid[p]
+line += f"| {item['星']}({item['天']})/{item['地']} "
+print(line + "|")
+
+# 使用範例
+if __name__ == "__main__":
+app = QiMenAutomation()
+# 設定你要觀測的時間
+target_time = datetime.datetime(2026, 3, 16, 13, 45)
+
+# 1. 取得干支
+day_gz, hour_gz = app.get_ganzhi(target_time)
+
+# 2. 取得局數 (此處手動輸入陽四局進行測試)
+is_yang, ju_num = True, 4
+
+# 3. 執行排盤
+app.run_layout(is_yang, ju_num, day_gz, hour_gz)

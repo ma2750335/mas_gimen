@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>玄學工具箱 ｜ 奇門遁甲 × 易經分析</title>
+  <meta name="description" content="玄學工具箱：奇門遁甲自動排盤系統與易經分析儀，支援天地盤、八門八神排布及卦象能量判斷">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+  <!-- ============================
+     頂部 Header
+     ============================ -->
+  <header class="header">
+    <div class="header-badge">
+      <span class="pulse-dot"></span>
+      玄學工具箱 · 數位版
+    </div>
+    <h1>玄學工具箱</h1>
+    <p>奇門遁甲排盤 &nbsp;×&nbsp; 易經起卦分析</p>
+  </header>
+
+  <!-- ============================
+     頁籤導航
+     ============================ -->
+  <nav class="tab-nav">
+    <div class="tab-nav-inner">
+      <button class="tab-btn active" id="tab-qmdj" data-tab="qmdj">
+        <span class="tab-icon">☰</span>
+        <span>奇門遁甲</span>
+      </button>
+      <button class="tab-btn" id="tab-yijing" data-tab="yijing">
+        <span class="tab-icon">☯</span>
+        <span>易經起卦</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ============================
+     奇門遁甲頁面
+     ============================ -->
+  <div id="page-qmdj" class="page active">
+    <main class="main-container">
+
+      <!-- 左側控制面板 -->
+      <aside class="control-panel">
+        <div class="panel-title">排盤設定</div>
+
+        <div class="mode-switcher">
+          <button class="mode-btn active" id="btn-mode-now">
+            <span class="icon">🕐</span>
+            <span>現在時間</span>
+          </button>
+          <button class="mode-btn" id="btn-mode-custom">
+            <span class="icon">📅</span>
+            <span>指定時間</span>
+          </button>
+        </div>
+
+        <!-- 時盤日盤切換 -->
+        <div class="chart-type-switcher">
+          <button class="chart-type-btn active" id="btn-type-hour">⏰ 時盤</button>
+          <button class="chart-type-btn" id="btn-type-day">🗓 日盤</button>
+        </div>
+
+        <div class="current-time-display">
+          <div id="current-time-display">
+            <div class="time-big">--:--:--</div>
+            <div class="time-sub">讀取中…</div>
+          </div>
+        </div>
+
+        <div id="custom-time-form" style="display:none;">
+          <div class="form-group" id="hour-datetime-group">
+            <label class="form-label" for="custom-datetime">選擇日期與時間</label>
+            <input type="datetime-local" id="custom-datetime" class="form-input">
+          </div>
+          <div class="form-group" id="day-date-group" style="display:none;">
+            <label class="form-label" for="custom-date">選擇日期（日盤全天固定）</label>
+            <input type="date" id="custom-date" class="form-input">
+          </div>
+        </div>
+
+        <!-- 手動覆蓋局數 -->
+        <div class="override-section">
+          <div class="override-header" id="override-toggle">
+            <span>⚙ 手動指定局數</span>
+            <span class="override-chevron" id="override-chevron">▶</span>
+          </div>
+          <div id="override-body" style="display:none;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;">
+              <div class="form-group" style="margin:0">
+                <label class="form-label">陰陽遁</label>
+                <select id="override-yang" class="form-input" style="padding:8px;">
+                  <option value="auto">自動</option>
+                  <option value="yang">陽遁</option>
+                  <option value="yin">陰遁</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin:0">
+                <label class="form-label">局數</label>
+                <select id="override-ju" class="form-input" style="padding:8px;">
+                  <option value="auto">自動</option>
+                  <option value="1">一局</option>
+                  <option value="2">二局</option>
+                  <option value="3">三局</option>
+                  <option value="4">四局</option>
+                  <option value="5">五局</option>
+                  <option value="6">六局</option>
+                  <option value="7">七局</option>
+                  <option value="8">八局</option>
+                  <option value="9">九局</option>
+                </select>
+              </div>
+            </div>
+            <div style="font-size:11px;color:var(--text-dim);margin-top:6px;line-height:1.6;">
+              ⚠ 手動指定會覆蓋自動計算結果<br>
+              自動值僅供參考，不同派別局數可能不同
+            </div>
+          </div>
+        </div>
+
+        <button class="btn-calculate" id="btn-calculate">
+          ✦ 開始排盤 ✦
+        </button>
+
+        <div class="panel-note">
+          <p>⚡ 節氣超接法判斷局數</p>
+          <p>🌐 節氣資料涵蓋 2024–2026 年</p>
+          <p>📐 支援陽遁、陰遁九局排盤</p>
+        </div>
+      </aside>
+
+      <!-- 右側結果區 -->
+      <section>
+        <div id="empty-state-qmdj" class="empty-state">
+          <span class="empty-icon">☰</span>
+          <p>點擊「開始排盤」<br>即可顯示奇門遁甲九宮盤</p>
+        </div>
+
+        <div class="result-area" id="result-area" style="display:none;">
+          <div class="info-cards" id="info-cards">
+            <div class="info-card animate-in" id="info-datetime"></div>
+            <div class="info-card animate-in" id="info-year"></div>
+            <div class="info-card animate-in" id="info-month"></div>
+            <div class="info-card animate-in" id="info-day"></div>
+            <div class="info-card animate-in" id="info-hour"></div>
+          </div>
+
+          <div class="ju-section" id="ju-info"></div>
+
+          <div class="bagua-title">九宮排盤</div>
+          <div class="bagua-grid" id="bagua-grid"></div>
+
+          <div class="grid-hint">
+            ☰ 天盤欄位顯示天干移位；地欄位為地盤天干；門為八門；星為九星；神為八神
+          </div>
+
+          <!-- AI 智能解盤區塊 -->
+          <div class="ai-analyze-section">
+            <div class="analysis-mode-switcher">
+              <button class="mode-opt active" id="mode-classic" data-mode="classic">經典模式</button>
+              <button class="mode-opt" id="mode-financial" data-mode="financial">金融實戰</button>
+            </div>
+
+            <button id="btn-ai-analyze" class="btn-ai">
+              <span class="icon">🪄</span> AI 智能解盤
+            </button>
+
+            <div id="ai-loading" class="ai-loading" style="display:none;">
+              <div class="spinner"></div>
+              <span>李俊穎帥哥正在用奇門遁甲推演全球金融局勢...</span>
+            </div>
+
+            <div id="ai-result" class="ai-result-content" style="display:none;">
+              <!-- OpenAI 解盤結果將插入這裡 -->
+            </div>
+          </div>
+
+          <div class="legend-section">
+            <div class="legend-card">
+              <h4>九星吉凶</h4>
+              <div class="legend-item"><span class="legend-name">天任・天衝・天輔・天心</span><span class="luck-tag ji">吉</span>
+              </div>
+              <div class="legend-item"><span class="legend-name">天蓬・天芮・天英・天柱</span><span class="luck-tag xiong">凶</span>
+              </div>
+              <div class="legend-item"><span class="legend-name">天禽</span><span class="luck-tag zhong">中</span></div>
+            </div>
+            <div class="legend-card">
+              <h4>八門吉凶</h4>
+              <div class="legend-item"><span class="legend-name">休門・生門・開門</span><span class="luck-tag ji">吉</span></div>
+              <div class="legend-item"><span class="legend-name">傷門・死門・驚門</span><span class="luck-tag xiong">凶</span>
+              </div>
+              <div class="legend-item"><span class="legend-name">景門・杜門</span><span class="luck-tag zhong">中</span></div>
+            </div>
+            <div class="legend-card">
+              <h4>天干五行</h4>
+              <div class="legend-item"><span class="legend-name wx-mu">甲・乙</span><span
+                  style="color:var(--text-dim)">木</span></div>
+              <div class="legend-item"><span class="legend-name wx-huo">丙・丁</span><span
+                  style="color:var(--text-dim)">火</span></div>
+              <div class="legend-item"><span class="legend-name wx-tu">戊・己</span><span
+                  style="color:var(--text-dim)">土</span></div>
+              <div class="legend-item"><span class="legend-name wx-jin">庚・辛</span><span
+                  style="color:var(--text-dim)">金</span></div>
+              <div class="legend-item"><span class="legend-name wx-shui">壬・癸</span><span
+                  style="color:var(--text-dim)">水</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ============================
+     易經起卦頁面
+     ============================ -->
+  <div id="page-yijing" class="page" style="display:none;">
+    <main class="main-container">
+
+      <!-- 左側控制面板 -->
+      <aside class="control-panel">
+        <div class="panel-title">起卦設定</div>
+
+        <!-- 起卦方式 -->
+        <div class="mode-switcher">
+          <button class="mode-btn active" id="yj-btn-random">
+            <span class="icon">🎲</span>
+            <span>隨機起卦</span>
+          </button>
+          <button class="mode-btn" id="yj-btn-manual">
+            <span class="icon">🔢</span>
+            <span>手動輸入</span>
+          </button>
+        </div>
+
+        <!-- 手動輸入區（預設隱藏） -->
+        <div id="yj-manual-form" style="display:none;">
+          <div class="form-group">
+            <label class="form-label" for="yj-num1">上卦數（1-999）</label>
+            <input type="number" id="yj-num1" class="form-input" min="1" max="999" placeholder="例：234">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="yj-num2">下卦數（1-999）</label>
+            <input type="number" id="yj-num2" class="form-input" min="1" max="999" placeholder="例：567">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="yj-num3">動爻數（1-999）</label>
+            <input type="number" id="yj-num3" class="form-input" min="1" max="999" placeholder="例：891">
+          </div>
+        </div>
+
+        <!-- 問事說明 -->
+        <div class="form-group" id="yj-question-group">
+          <label class="form-label" for="yj-question">問事（選填）</label>
+          <input type="text" id="yj-question" class="form-input" placeholder="例：今日是否適合交易…">
+        </div>
+
+        <button class="btn-calculate yj-color" id="yj-btn-calculate">
+          ☯ 起卦分析 ☯
+        </button>
+
+        <div class="panel-note">
+          <p>🎲 隨機起卦模擬傳統擲骰</p>
+          <p>📊 五行生剋判斷趨勢走向</p>
+          <p>⚡ 漢明距離評估能量波動</p>
+        </div>
+      </aside>
+
+      <!-- 右側結果區 -->
+      <section>
+        <div id="empty-state-yijing" class="empty-state">
+          <span class="empty-icon">☯</span>
+          <p>點擊「起卦分析」<br>即可顯示易經卦象與能量分析</p>
+        </div>
+
+        <div class="result-area yj-result" id="yj-result-area" style="display:none;">
+          <!-- 卦名主卡 -->
+          <div id="yj-hexagram-card"></div>
+          <!-- 五行能量條 -->
+          <div id="yj-wuxing-row"></div>
+          <!-- 生剋分析 -->
+          <div id="yj-trend-card"></div>
+          <!-- 六爻視覺化 + 變卦 -->
+          <div id="yj-yao-section"></div>
+          <!-- C理論管理指南 -->
+          <div id="yj-c-theory"></div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <footer class="footer">
+    <p>玄學工具箱 &nbsp;｜&nbsp; 奇門遁甲・易經起卦 &nbsp;｜&nbsp; 僅供學習研究使用</p>
+  </footer>
+
+  <script type="module" src="app.js"></script>
+  <script type="module" src="yijing_app.js"></script>
+  <script>
+    // 頁籤切換邏輯
+    document.addEventListener('DOMContentLoaded', () => {
+      const tabs = document.querySelectorAll('.tab-btn');
+      const pages = { qmdj: document.getElementById('page-qmdj'), yijing: document.getElementById('page-yijing') };
+
+      tabs.forEach(btn => {
+        btn.addEventListener('click', () => {
+          tabs.forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const target = btn.dataset.tab;
+          Object.entries(pages).forEach(([key, el]) => {
+            el.style.display = key === target ? 'block' : 'none';
+          });
+        });
+      });
+
+      // 奇門排盤結果顯示切換
+      const calcBtn = document.getElementById('btn-calculate');
+      if (calcBtn) {
+        calcBtn.addEventListener('click', () => {
+          document.getElementById('empty-state-qmdj').style.display = 'none';
+          document.getElementById('result-area').style.display = 'block';
+        });
+      }
+
+      // 易經起卦結果顯示切換
+      const yjCalcBtn = document.getElementById('yj-btn-calculate');
+      if (yjCalcBtn) {
+        yjCalcBtn.addEventListener('click', () => {
+          document.getElementById('empty-state-yijing').style.display = 'none';
+          document.getElementById('yj-result-area').style.display = 'block';
+        });
+      }
+    });
+  </script>
+
+</body>
+
+</html>

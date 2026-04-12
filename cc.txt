@@ -1,0 +1,158 @@
+import datetime
+
+class QiMenPro:
+"""
+    奇門遁甲自動化研究工具 (金融策略專用版)
+    """
+def __init__(self):
+# 基礎零件定義
+self.TIANGAN = "甲乙丙丁戊己庚辛壬癸" # Ten Stems
+self.DIZHI = "子丑寅卯辰巳午未申酉戌亥"   # Twelve Branches
+self.PALACES = [1, 8, 3, 4, 9, 2, 7, 6]  # 九宮轉動路徑 (不含中5)
+
+# 原始星門配置 (Original Positions)
+self.ORIG_STARS = {1:"天蓬", 8:"天任", 3:"天衝", 4:"天輔", 9:"天英", 2:"天芮", 7:"天柱", 6:"天心", 5:"天禽"}
+self.ORIG_GATES = {1:"休門", 8:"生門", 3:"傷門", 4:"杜門", 9:"景門", 2:"死門", 7:"驚門", 6:"開門"}
+self.GODS_LIST = ["值符", "螣蛇", "太陰", "六合", "白虎", "玄武", "九地", "九天"]
+
+def get_xun_shou(self, hour_gz):
+"""
+        [步驟] 尋找旬首：判斷時辰屬於哪一個大將(六儀)管轄
+        """
+h_gan = hour_gz[0]
+h_zhi = hour_gz[1]
+gan_idx = self.TIANGAN.index(h_gan)
+zhi_idx = self.DIZHI.index(h_zhi)
+
+# 計算旬首地支索引
+xun_zhi_idx = (zhi_idx - gan_idx) % 12
+xun_zhi = self.DIZHI[xun_zhi_idx]
+
+# 六甲隱於六儀
+xun_shou_map = {"子":"戊", "戌":"己", "申":"庚", "午":"辛", "辰":"壬", "寅":"癸"}
+return xun_shou_map[xun_zhi], xun_zhi
+
+def get_kong_wang(self, hour_gz):
+"""
+        [步驟] 計算空亡：找出能量暫時真空的方位 (對金融策略判斷很有幫助)
+        """
+h_gan = hour_gz[0]
+h_zhi = hour_gz[1]
+gan_idx = self.TIANGAN.index(h_gan)
+zhi_idx = self.DIZHI.index(h_zhi)
+# 空亡地支索引
+kw_idx1 = (zhi_idx + (10 - gan_idx)) % 12
+kw_idx2 = (kw_idx1 + 1) % 12
+return self.DIZHI[kw_idx1], self.DIZHI[kw_idx2]
+
+def run(self, is_yang, ju_num, day_gz, hour_gz):
+"""
+        [核心] 執行排盤演算法
+        """
+# 1. 布地盤 (Earth Plate)
+di_pan = {}
+stems_order = "戊己庚辛壬癸丁丙乙" if is_yang else "戊乙丙丁癸壬辛庚己"
+curr = ju_num
+for s in stems_order:
+di_pan[curr] = s
+curr = (curr + 1) if is_yang else (curr - 1)
+if curr > 9: curr = 1
+if curr < 1: curr = 9
+
+# 2. 確定旬首與值符、值使
+xun_stem, xun_zhi = self.get_xun_shou(hour_gz)
+# 旬首在地盤哪一宮
+xun_palace = [k for k, v in di_pan.items() if v == xun_stem][0]
+zhi_fu_star = self.ORIG_STARS[xun_palace]
+zhi_shi_gate = self.ORIG_GATES[xun_palace if xun_palace != 5 else 2]
+
+# 3. 布天盤星 (Heavenly Plate Stars)
+# 時干在地盤的位置 (如果是甲，看旬首)
+target_stem = hour_gz[0] if hour_gz[0] != '甲' else xun_stem
+target_p = [k for k, v in di_pan.items() if v == target_stem][0]
+
+# 星隨轉 (排除中宮5，5宮星寄於2宮)
+rotation_path = [1, 8, 3, 4, 9, 2, 7, 6]
+start_idx = rotation_path.index(xun_palace if xun_palace != 5 else 2)
+target_idx = rotation_path.index(target_p if target_p != 5 else 2)
+shift = (target_idx - start_idx) % 8
+
+tian_pan = {}
+for i, p in enumerate(rotation_path):
+old_p = rotation_path[(i - shift) % 8]
+# 天盤干：將地盤對應宮位的天干帶上來
+stem_on_star = di_pan[old_p]
+if old_p == 2: # 芮禽同宮處理
+stem_on_star = f"{di_pan[2]}{di_pan[5]}"
+
+tian_pan[p] = {
+星: self.ORIG_STARS[old_p],
+天干: stem_on_star
+}
+
+# 4. 布八門 (Eight Gates)
+# 值使隨時辰支在九宮順序(1-2-3-4-5-6-7-8-9)中移動
+# 計算偏移量 (從旬首地支到時辰地支)
+zhi_idx_map = {z: i for i, z in enumerate(self.DIZHI)}
+offset = (zhi_idx_map[hour_gz[1]] - zhi_idx_map[xun_zhi]) % 12
+
+gate_pos = xun_palace
+for _ in range(offset):
+gate_pos = (gate_pos + 1) if is_yang else (gate_pos - 1)
+if gate_pos > 9: gate_pos = 1
+if gate_pos < 1: gate_pos = 9
+
+# 如果落在中5，陽遁寄2，陰遁寄8 (此處採常用寄2法)
+if gate_pos == 5: gate_pos = 2
+
+# 八門依序排列
+gate_order = [1, 8, 3, 4, 9, 2, 7, 6]
+g_start_idx = gate_order.index(gate_pos)
+g_orig_idx = gate_order.index(xun_palace if xun_palace != 5 else 2)
+g_shift = (g_start_idx - g_orig_idx) % 8
+
+final_gates = {}
+for i, p in enumerate(gate_order):
+old_p = gate_order[(i - g_shift) % 8]
+final_gates[p] = self.ORIG_GATES[old_p]
+
+# 5. 布八神 (Eight Gods)
+# 神隨值符星落宮，陽順陰逆
+god_path = [1, 8, 3, 4, 9, 2, 7, 6]
+god_start_idx = god_path.index(target_p if target_p != 5 else 2)
+final_gods = {}
+for i in range(8):
+if is_yang:
+p = god_path[(god_start_idx + i) % 8]
+else:
+p = god_path[(god_start_idx - i) % 8]
+final_gods[p] = self.GODS_LIST[i]
+
+# 6. 計算空亡
+kw = self.get_kong_wang(hour_gz)
+
+# ---------------- 格式化輸出 ----------------
+print(f"\n【時家奇門 - 智能策略盤】")
+print(f"時間：{day_gz}日 {hour_gz}時 | 旬首：甲{xun_zhi}({xun_stem}) | 空亡：{kw}")
+print(f"定局：{'陽' if is_yang else '陰'}遁 {ju_num} 局")
+print("-" * 50)
+
+rows = [[4, 9, 2], [3, 5, 7], [8, 1, 6]]
+for r in rows:
+line = ""
+for p in r:
+if p == 5:
+line += f"|   中({di_pan[5]})   "
+else:
+star = tian_pan[p]["星"]
+stem = tian_pan[p]["天干"]
+gate = final_gates[p]
+god = final_gods[p]
+line += f"|{god:^3}{star:^3}({stem:^1})/{gate:^3}/{di_pan[p]:^1}"
+print(line + "|")
+
+# --- 啟動研究工具 ---
+if __name__ == "__main__":
+engine = QiMenPro()
+# 模擬 2026-03-16 13:45 陽四局
+engine.run(is_yang=True, ju_num=4, day_gz="己丑", hour_gz="辛未")

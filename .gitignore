@@ -1,0 +1,11 @@
+.env
+node_modules
+bin/
+build/
+exe_build/
+package-lock.json
+__pycache__/
+test.py
+demo-user/
+*.spec
+dist/
