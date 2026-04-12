@@ -10,7 +10,7 @@ app.use(cors());
 app.use(express.json());
 
 // 服務靜態前端檔案
-app.use(express.static(__dirname));
+app.use(express.static(path.join(__dirname, 'public')));
 
 const PORT = process.env.PORT || 3000;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
@@ -35,16 +35,16 @@ function loadFile(filename) {
 }
 
 // 傳統經典模式 (Classic)
-const classicLogicHour   = loadFile('analysis_logic.txt');
-const classicLogicDaily  = loadFile('analysis_logic_daily.txt');
-const classicPromptHour  = loadFile('prompt_format_hour.txt');
-const classicPromptDaily = loadFile('prompt_format_daily.txt');
+const classicLogicHour   = loadFile('config/prompts/analysis_logic.txt');
+const classicLogicDaily  = loadFile('config/prompts/analysis_logic_daily.txt');
+const classicPromptHour  = loadFile('config/prompts/prompt_format_hour.txt');
+const classicPromptDaily = loadFile('config/prompts/prompt_format_daily.txt');
 
 // 金融實戰模式 (Financial v2)
-const finLogicHour       = loadFile('analysis_logic_fin.txt');
-const finLogicDaily      = loadFile('analysis_logic_fin_daily.txt');
-const finPromptHour      = loadFile('prompt_format_fin_hour.txt');
-const finPromptDaily     = loadFile('prompt_format_fin_daily.txt');
+const finLogicHour       = loadFile('config/prompts/analysis_logic_fin.txt');
+const finLogicDaily      = loadFile('config/prompts/analysis_logic_fin_daily.txt');
+const finPromptHour      = loadFile('config/prompts/prompt_format_fin_hour.txt');
+const finPromptDaily     = loadFile('config/prompts/prompt_format_fin_daily.txt');
 
 console.log(`✅ 系統邏輯:   傳統模式 [時:${!!classicLogicHour} 日:${!!classicLogicDaily}] | 金融模式 [時:${!!finLogicHour} 日:${!!finLogicDaily}]`);
 
@@ -131,10 +131,10 @@ app.post('/api/layout', async (req, res) => {
     // 動態載入前端的排盤模組
     let layout;
     if (chartType === 'day') {
-      const qmdjDaily = await import('./qmdj_daily.js');
+      const qmdjDaily = await import('./public/lib/qmdj_daily.js');
       layout = qmdjDaily.buildDailyLayout(dt);
     } else {
-      const qmdjHour = await import('./qmdj.js');
+      const qmdjHour = await import('./public/lib/qmdj.js');
       layout = qmdjHour.buildFullLayout(dt, { yang: null, ju: null });
     }
 

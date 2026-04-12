@@ -8,8 +8,8 @@ import {
   TIANGAN_WUXING,
   STAR_LUCK,
   GATE_LUCK
-} from './qmdj.js';
-import { buildDailyLayout } from './qmdj_daily.js';
+} from './lib/qmdj.js';
+import { buildDailyLayout } from './lib/qmdj_daily.js';
 
 // ====================================================
 // 全域狀態

@@ -4,7 +4,7 @@
 import {
   BAGUA_DATA, WUXING_COLOR, WUXING_SYMBOL, XIANG_SHENG, XIANG_KE,
   performDivination, renderYaoLines
-} from './yijing.js';
+} from './lib/yijing.js';
 
 let yjMode = 'random'; // 'random' | 'manual'
 
