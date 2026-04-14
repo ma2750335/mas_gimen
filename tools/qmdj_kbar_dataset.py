@@ -15,12 +15,21 @@ import os
 import sys
 import pandas as pd
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
 
 # 確保 tools/ 目錄在 import 路徑
 sys.path.insert(0, os.path.dirname(__file__))
 
 from qmdj_client import get_layout, layout_to_dataframe
 from fx_kbar import get_m15_bars
+
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
+
+# 從 .env 讀取設定
+DIR_THRESHOLD = float(os.getenv("LABEL_DIR_THRESHOLD", "0.001"))
+PATH_RANGE_THRESHOLD = float(os.getenv("LABEL_PATH_RANGE_THRESHOLD", "0.001"))
+PATH_ONE_SIDED_RATIO = float(os.getenv("LABEL_PATH_ONE_SIDED_RATIO", "3"))
+M15_BUFFER_DAYS = int(os.getenv("DATASET_M15_BUFFER_DAYS", "2"))
 
 # ============================================================
 # 常數
@@ -143,13 +152,17 @@ def compute_market_features(open_p: float, high_p: float,
     }
 
 
-def label_direction(ret_close_open: float, threshold: float = 0.001) -> int:
+def label_direction(ret_close_open: float, threshold: float = None) -> int:
     """
     方向標籤。
-    > +0.1% → 1 (漲)
-    < -0.1% → -1 (跌)
+    > +threshold → 1 (漲)
+    < -threshold → -1 (跌)
     其他 → 0 (平/震盪)
+
+    threshold 預設讀取 .env 的 LABEL_DIR_THRESHOLD (0.001 = 0.1%)
     """
+    if threshold is None:
+        threshold = DIR_THRESHOLD
     if ret_close_open > threshold:
         return 1
     elif ret_close_open < -threshold:
@@ -159,18 +172,24 @@ def label_direction(ret_close_open: float, threshold: float = 0.001) -> int:
 
 def label_path_type(m15_df: pd.DataFrame, open_p: float,
                     close_p: float, range_hl: float,
-                    threshold: float = 0.001) -> str:
+                    threshold: float = None,
+                    one_sided_ratio: float = None) -> str:
     """
-    路徑標籤（用 M15 子 K 線判斷高低點先後順序）。
+    路徑標籤（純粹由 M15 子 K 線的高低點時間順序決定，不依賴收盤方向）。
+
+    判斷邏輯：
+    - 將 2H 區間切成前半 / 後半
+    - 用 M15 的累積報酬曲線計算前半最大漲幅、前半最大跌幅
+    - 根據高低點出現在前半或後半，以及兩者的幅度差異來分類
 
     Parameters
     ----------
     m15_df : pd.DataFrame
-        該 2H 區間內的 M15 K 線，columns 至少需有 ts, high, low。
+        該 2H 區間內的 M15 K 線，columns 至少需有 ts, open, high, low, close。
     open_p : float
         2H K Bar 開盤價。
     close_p : float
-        2H K Bar 收盤價。
+        2H K Bar 收盤價（此函式不使用，僅保留介面相容）。
     range_hl : float
         (high - low) / open 比例。
     threshold : float
@@ -179,8 +198,13 @@ def label_path_type(m15_df: pd.DataFrame, open_p: float,
     Returns
     -------
     str
-        UP_FIRST_DOWN / DOWN_FIRST_UP / UP_CONTINUE / DOWN_CONTINUE / RANGE
+        UP_FIRST / DOWN_FIRST / UP_CONTINUE / DOWN_CONTINUE / RANGE
     """
+    if threshold is None:
+        threshold = PATH_RANGE_THRESHOLD
+    if one_sided_ratio is None:
+        one_sided_ratio = PATH_ONE_SIDED_RATIO
+
     if m15_df.empty or len(m15_df) < 2:
         return "RANGE"
 
@@ -188,25 +212,35 @@ def label_path_type(m15_df: pd.DataFrame, open_p: float,
     if range_hl < threshold:
         return "RANGE"
 
-    # 找最高價和最低價出現的時間索引位置
-    high_idx = m15_df["high"].idxmax()
-    low_idx = m15_df["low"].idxmin()
-    high_pos = m15_df.index.get_loc(high_idx)
-    low_pos = m15_df.index.get_loc(low_idx)
-    mid = len(m15_df) / 2
+    n = len(m15_df)
+    mid = n / 2
 
-    is_up = close_p > open_p
-    is_down = close_p < open_p
+    # 找最高價和最低價出現的位置（純時間順序）
+    high_pos = m15_df["high"].values.argmax()
+    low_pos = m15_df["low"].values.argmin()
+
+    high_in_first_half = high_pos < mid
+    low_in_first_half = low_pos < mid
     high_first = high_pos < low_pos
 
-    if high_first and is_down:
-        return "UP_FIRST_DOWN"
-    elif not high_first and is_up:
-        return "DOWN_FIRST_UP"
-    elif high_pos >= mid and is_up:
-        return "UP_CONTINUE"
-    elif low_pos >= mid and is_down:
-        return "DOWN_CONTINUE"
+    # 計算高低點偏離開盤的幅度
+    h = float(m15_df["high"].max())
+    l = float(m15_df["low"].min())
+    up_range = (h - open_p) / open_p    # 上行幅度
+    down_range = (open_p - l) / open_p   # 下行幅度
+
+    # 判斷是否為單邊行情：一邊幅度遠大於另一邊
+    is_one_sided_up = up_range > down_range * one_sided_ratio and up_range > threshold
+    is_one_sided_down = down_range > up_range * one_sided_ratio and down_range > threshold
+
+    if is_one_sided_up and not high_in_first_half:
+        return "UP_CONTINUE"       # 單邊上行，高點在後半
+    elif is_one_sided_down and not low_in_first_half:
+        return "DOWN_CONTINUE"     # 單邊下行，低點在後半
+    elif high_first:
+        return "UP_FIRST"          # 先衝高後回落（不管最終收漲收跌）
+    elif not high_first:
+        return "DOWN_FIRST"        # 先探底後反彈（不管最終收漲收跌）
     else:
         return "RANGE"
 
@@ -271,9 +305,9 @@ def build_dataset(symbol: str, start_date: str, end_date: str,
     slots = generate_shichen_slots(start_date, end_date)
     print(f"       共 {len(slots)} 個時辰")
 
-    # 批量撈 M15（UTC，前後各多撈兩天確保時差邊界完整）
-    m15_start = (datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=2)).strftime("%Y-%m-%d")
-    m15_end = (datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=2)).strftime("%Y-%m-%d")
+    # 批量撈 M15（UTC，前後各多撈幾天確保時差邊界完整）
+    m15_start = (datetime.strptime(start_date, "%Y-%m-%d") - timedelta(days=M15_BUFFER_DAYS)).strftime("%Y-%m-%d")
+    m15_end = (datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=M15_BUFFER_DAYS)).strftime("%Y-%m-%d")
     print(f"[2/4] 撈取 M15 資料（UTC）: {m15_start} ~ {m15_end}")
     m15_all = get_m15_bars(symbol, m15_start, m15_end)
     print(f"       共 {len(m15_all)} 根 M15 K 線")
@@ -378,12 +412,13 @@ def build_dataset(symbol: str, start_date: str, end_date: str,
 # ============================================================
 
 if __name__ == "__main__":
-    symbol = "GOLD_"
-    start = "2026-03-01"
-    end = "2026-03-07"
+    symbol = os.getenv("DATASET_SYMBOL", "GOLD_")
+    start = os.getenv("DATASET_START_DATE", "2025-01-01")
+    end = os.getenv("DATASET_END_DATE", "2026-03-31")
 
     OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "output")
 
+    print(f"商品: {symbol}  日期: {start} ~ {end}")
     df = build_dataset(
         symbol=symbol,
         start_date=start,
